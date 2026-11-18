@@ -1,0 +1,55 @@
+name: Build and Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  build-and-test:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-env
+        with:
+          dotnet-version: |
+            6.0.x
+            7.0.x
+            8.0.x
+            9.0.x
+            10.0.x
+            11.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore Ling.Filter.slnx
+
+      - name: Build
+        run: dotnet build Ling.Filter.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -warnaserror
+
+      - name: Run tests
+        run: dotnet test Ling.Filter.slnx --configuration Release --no-build --no-restore --verbosity normal
+
+      - name: Verify NuGet package can be created
+        run: dotnet pack src/Ling.Filter/Ling.Filter.csproj --configuration Release --no-build --no-restore --output artifacts/package -p:ContinuousIntegrationBuild=true

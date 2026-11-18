@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Basic.Reference.Assemblies.Net80" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.XUnit" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.XUnit" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ling.Filter.Analyzers\Ling.Filter.Analyzers.csproj" />
+    <ProjectReference Include="..\..\src\Ling.Filter.CodeFixes\Ling.Filter.CodeFixes.csproj" />
+    <ProjectReference Include="..\..\src\Ling.Filter\Ling.Filter.csproj" />
+  </ItemGroup>
+
+</Project>

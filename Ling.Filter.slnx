@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/Ling.Filter.Sample.Contracts/Ling.Filter.Sample.Contracts.csproj" />
+    <Project Path="samples/Ling.Filter.Sample/Ling.Filter.Sample.csproj" />
+  </Folder>
+  <Folder Name="/solution items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="nuget.config" />
+    <File Path="README.md" />
+    <File Path="README.zh-CN.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <File Path="src/Directory.Build.props" />
+    <File Path="src/Directory.Packages.props" />
+    <Project Path="src/Ling.Filter.Analyzers/Ling.Filter.Analyzers.csproj" />
+    <Project Path="src/Ling.Filter.CodeFixes/Ling.Filter.CodeFixes.csproj" />
+    <Project Path="src/Ling.Filter.Common/Ling.Filter.Common.shproj" />
+    <Project Path="src/Ling.Filter.Generators/Ling.Filter.Generators.csproj" />
+    <Project Path="src/Ling.Filter/Ling.Filter.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <File Path="tests/Directory.Build.props" />
+    <File Path="tests/Directory.Packages.props" />
+    <Project Path="tests/Ling.Filter.Analyzers.Test/Ling.Filter.Analyzers.Test.csproj" />
+    <Project Path="tests/Ling.Filter.Generators.Test/Ling.Filter.Generators.Test.csproj" />
+    <Project Path="tests/Ling.Filter.NativeAotSmoke/Ling.Filter.NativeAotSmoke.csproj" />
+    <Project Path="tests/Ling.Filter.Test/Ling.Filter.Test.csproj" />
+  </Folder>
+</Solution>
