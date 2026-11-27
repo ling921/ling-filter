@@ -44,6 +44,18 @@ public sealed class MultiFieldFilterAttribute : Attribute
     public bool CaseInsensitive { get; set; }
 
     /// <summary>
+    /// Gets or sets the relational comparison operator used when comparing non-string scalar fields.
+    /// Defaults to <see cref="CompareOperator.Equal"/>.
+    /// </summary>
+    public CompareOperator Operator { get; set; } = CompareOperator.Equal;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether non-nullable value-type properties skip predicate generation
+    /// when their value equals <see langword="default"/>.
+    /// </summary>
+    public bool IgnoreDefaultValue { get; set; }
+
+    /// <summary>
     /// Gets or sets an optional logical group name for combining this multi-field predicate with other grouped properties.
     /// </summary>
     public string? Group { get; set; }

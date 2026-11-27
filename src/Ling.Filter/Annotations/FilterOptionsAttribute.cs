@@ -38,6 +38,26 @@ public sealed class FilterOptionsAttribute : Attribute
     public bool TrimStringsByDefault { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether string comparisons normalize both sides using <c>ToLower()</c> by default.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool CaseInsensitiveStringsByDefault { get; set; }
+
+    /// <summary>
+    /// Gets or sets the default logical operator used to combine top-level filter predicates and groups.
+    /// Defaults to <see cref="CombineLogic.And"/>.
+    /// </summary>
+    public CombineLogic DefaultLogic { get; set; } = CombineLogic.And;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether accessible scalar properties on the target entity are automatically
+    /// exposed as allowed dynamic sort fields when implementing <see cref="ISortable{TEntity}"/>.
+    /// Set to <see langword="false"/> to enforce a strict explicit <see cref="SortFieldAttribute"/> whitelist.
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    public bool AutoMapSortableProperties { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets a value indicating whether the analyzer reports warning <c>LF0005</c> when a public readable property
     /// on the filter model cannot be mapped to any property on the target entity and is not marked with <see cref="FilterIgnoreAttribute"/>.
     /// Defaults to <see langword="true"/>.

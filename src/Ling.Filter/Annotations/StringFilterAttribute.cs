@@ -47,4 +47,15 @@ public sealed class StringFilterAttribute : FilterBaseAttribute
     {
         Mode = mode;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StringFilterAttribute"/> class with the specified matching mode and target property path.
+    /// </summary>
+    /// <param name="mode">The string matching mode to apply.</param>
+    /// <param name="target">The target property name or dot-separated navigation path on the entity.</param>
+    public StringFilterAttribute(StringFilterMode mode, string target)
+    {
+        Mode = mode;
+        Target = target;
+    }
 }

@@ -107,4 +107,53 @@ internal static class AttributeDataExtensions
 
         return null;
     }
+
+    /// <summary>
+    /// Extracts <c>NavigationProperty</c>, <c>Quantifier</c>, and <c>ElementProperty</c> from a <c>CollectionFilterAttribute</c>,
+    /// supporting all constructor overloads and named arguments.
+    /// </summary>
+    public static void GetCollectionFilterArgs(
+        this AttributeData attribute,
+        out string? navigationProperty,
+        out int quantifier,
+        out string? elementProperty)
+    {
+        navigationProperty = attribute.GetStringValue("NavigationProperty", fallbackCtorIndex: 0);
+        quantifier = 0; // CollectionQuantifier.Any
+        elementProperty = null;
+
+        // Check constructor arguments beyond index 0:
+        // Overload 2: (string navigationProperty, string elementProperty)
+        // Overload 3: (string navigationProperty, CollectionQuantifier quantifier, string? elementProperty = null)
+        if (attribute.ConstructorArguments.Length >= 2)
+        {
+            var arg1 = attribute.ConstructorArguments[1];
+            if (arg1.Kind == TypedConstantKind.Enum && arg1.Value is not null)
+            {
+                quantifier = Convert.ToInt32(arg1.Value);
+                if (attribute.ConstructorArguments.Length >= 3 &&
+                    attribute.ConstructorArguments[2].Value is string elemFromArg2)
+                {
+                    elementProperty = elemFromArg2;
+                }
+            }
+            else if (arg1.Value is string elemFromArg1)
+            {
+                elementProperty = elemFromArg1;
+            }
+        }
+
+        // Named arguments override constructor arguments
+        foreach (var pair in attribute.NamedArguments)
+        {
+            if (pair.Key == "Quantifier" && pair.Value.Value is not null)
+            {
+                quantifier = Convert.ToInt32(pair.Value.Value);
+            }
+            else if (pair.Key == "ElementProperty" && pair.Value.Value is string namedElem)
+            {
+                elementProperty = namedElem;
+            }
+        }
+    }
 }

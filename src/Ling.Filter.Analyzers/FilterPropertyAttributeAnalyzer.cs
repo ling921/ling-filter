@@ -223,6 +223,19 @@ public sealed class FilterPropertyAttributeAnalyzer : DiagnosticAnalyzer
                     return false;
                 }
 
+                if (attrData.GetEnumIntValue("Precision", defaultValue: 0) != 0 &&
+                    !rangeElem.IsDateOrTimeType(out _))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        DiagnosticDescriptors.AttributeIncompatibleWithPropertyType,
+                        location,
+                        attrShortName,
+                        propSymbol.Name,
+                        typeDisplay,
+                        "DatePrecision requires 'ValueRange<T>' where T is 'DateTime', 'DateTimeOffset', 'DateOnly', or 'TimeOnly'"));
+                    return false;
+                }
+
                 return true;
 
             case Constants.DateFilterAttributeMetadataName:
@@ -327,6 +340,7 @@ public sealed class FilterPropertyAttributeAnalyzer : DiagnosticAnalyzer
         }
 
         var stringMode = attrData.GetEnumIntValue("Mode", defaultValue: 2); // Contains
+        var op = attrData.GetEnumIntValue("Operator", defaultValue: 0);
         foreach (var fieldPath in fields)
         {
             if (!PropertyPathResolver.TryResolvePath(context.Compilation, entityType, fieldPath, out var segments, out var failed))
@@ -357,7 +371,8 @@ public sealed class FilterPropertyAttributeAnalyzer : DiagnosticAnalyzer
                             : "string pattern matching requires a string target field"));
                 }
             }
-            else if (!propSymbol.Type.IsScalarCompatibleWith(targetType))
+            else if (!propSymbol.Type.IsScalarCompatibleWith(targetType) ||
+                     (op is 2 or 3 or 4 or 5 && (!propSymbol.Type.SupportsRelationalOperators() || !targetType.SupportsRelationalOperators())))
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     DiagnosticDescriptors.FilterAndTargetTypesIncompatible,
@@ -378,7 +393,7 @@ public sealed class FilterPropertyAttributeAnalyzer : DiagnosticAnalyzer
         AttributeData attrData,
         ITypeSymbol entityType)
     {
-        var navPath = attrData.GetStringValue("NavigationProperty", fallbackCtorIndex: 0);
+        attrData.GetCollectionFilterArgs(out var navPath, out _, out var elementPath);
         if (string.IsNullOrWhiteSpace(navPath))
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -411,7 +426,6 @@ public sealed class FilterPropertyAttributeAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var elementPath = attrData.GetStringValue("ElementProperty", fallbackCtorIndex: 1);
         ITypeSymbol targetScalarType;
         string displayTarget;
 

@@ -9,12 +9,12 @@ namespace Ling.Filter;
 public interface IPagedFilter
 {
     /// <summary>
-    /// Gets or sets the 1-based page number. Values less than <c>1</c> are normalized to <c>1</c> when paging is applied.
+    /// Gets the 1-based page number. Values less than <c>1</c> are normalized to <c>1</c> when paging is applied.
     /// </summary>
-    int? Page { get; set; }
+    int? Page { get; }
 
     /// <summary>
-    /// Gets or sets the maximum number of items per page. Paging is skipped when <see langword="null"/> or less than or equal to <c>0</c>.
+    /// Gets the maximum number of items per page. Paging is skipped when <see langword="null"/> or less than or equal to <c>0</c>.
     /// </summary>
-    int? PageSize { get; set; }
+    int? PageSize { get; }
 }

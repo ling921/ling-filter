@@ -128,7 +128,21 @@ partial class FilterGenerator
             if (!target.Rules.IsEmpty)
             {
                 cb.AppendLine();
-                EmitRuleBlocks(cb, target, isQueryableMode: true);
+                if (target.DefaultLogicValue == 1) // CombineLogic.Or
+                {
+                    var exprType = $"global::System.Linq.Expressions.Expression<global::System.Func<{target.EntityFullName}, bool>>";
+                    cb.AppendFormatLine("{0}? __predicate = null;", exprType);
+                    EmitRuleBlocks(cb, target, isQueryableMode: false);
+                    cb.AppendLine();
+                    cb.AppendLine("if (__predicate is not null)");
+                    cb.OpenBrace();
+                    cb.AppendLine("query = global::System.Linq.Queryable.Where(query, __predicate);");
+                    cb.CloseBrace();
+                }
+                else
+                {
+                    EmitRuleBlocks(cb, target, isQueryableMode: true);
+                }
             }
 
             cb.AppendLine();
@@ -139,6 +153,7 @@ partial class FilterGenerator
         private static void EmitRuleBlocks(CodeBuilder cb, EntityTargetSpec target, bool isQueryableMode)
         {
             var exprType = $"global::System.Linq.Expressions.Expression<global::System.Func<{target.EntityFullName}, bool>>";
+            var topCombiner = target.DefaultLogicValue == 1 ? "Or" : "And";
             var groupLogicMap = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var grp in target.Groups)
             {
@@ -162,7 +177,7 @@ partial class FilterGenerator
             foreach (var rule in target.Rules)
             {
                 cb.AppendLine();
-                EmitSingleRule(cb, target.EntityFullName, rule, ruleIndex++, isQueryableMode, groupVars, groupLogicMap);
+                EmitSingleRule(cb, target.EntityFullName, rule, ruleIndex++, isQueryableMode, topCombiner, groupVars, groupLogicMap);
             }
 
             foreach (var kvp in groupVars)
@@ -177,7 +192,7 @@ partial class FilterGenerator
                 }
                 else
                 {
-                    cb.AppendFormatLine("__predicate = global::Ling.Filter.Expressions.ExpressionCombiner.And(__predicate, {0});", gVar);
+                    cb.AppendFormatLine("__predicate = global::Ling.Filter.Expressions.ExpressionCombiner.{0}(__predicate, {1});", topCombiner, gVar);
                 }
 
                 cb.CloseBrace();
@@ -189,6 +204,7 @@ partial class FilterGenerator
             string entityFullName,
             string lambdaText,
             bool isQueryableMode,
+            string topCombiner,
             string? groupName,
             Dictionary<string, string> groupVars,
             Dictionary<string, int> groupLogicMap)
@@ -213,7 +229,8 @@ partial class FilterGenerator
             else
             {
                 cb.AppendFormatLine(
-                    "__predicate = global::Ling.Filter.Expressions.ExpressionCombiner.And<{0}>(__predicate, {1});",
+                    "__predicate = global::Ling.Filter.Expressions.ExpressionCombiner.{0}<{1}>(__predicate, {2});",
+                    topCombiner,
                     entityFullName,
                     lambdaText);
             }
@@ -225,6 +242,7 @@ partial class FilterGenerator
             FilterRuleSpec rule,
             int idx,
             bool isQueryableMode,
+            string topCombiner,
             Dictionary<string, string> groupVars,
             Dictionary<string, int> groupLogicMap)
         {
@@ -236,7 +254,7 @@ partial class FilterGenerator
                     cb.AppendFormatLine("var {0} = this.{1}();", vCustom, rule.MemberName);
                     cb.AppendFormatLine("if ({0} is not null)", vCustom);
                     cb.OpenBrace();
-                    EmitAppendLambda(cb, entityFullName, vCustom, isQueryableMode, null, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, vCustom, isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     cb.CloseBrace();
                     break;
                 }
@@ -249,7 +267,7 @@ partial class FilterGenerator
                     var vName = $"__v{idx}";
                     cb.AppendFormatLine("var {0} = {1};", vName, BuildStringLocalValue($"this.{rule.MemberName}", rule.TrimString, rule.CaseInsensitive));
                     var body = BuildStringPredicateBody("x", rule.TargetPath, vName, rule.StringMode, rule.CaseInsensitive);
-                    EmitAppendLambda(cb, entityFullName, $"x => {body}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, $"x => {body}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     cb.CloseBrace();
                     break;
                 }
@@ -282,17 +300,19 @@ partial class FilterGenerator
                     }
 
                     var subBodies = new List<string>(rule.MultiFieldPaths.Length);
+                    var opSym = CompareOpSymbol(rule.CompareOp);
+                    var isNegated = rule.CompareOp == 1;
                     foreach (var path in rule.MultiFieldPaths)
                     {
                         var sub = isStringMember
                             ? BuildStringPredicateBody("x", path, vName, rule.StringMode, rule.CaseInsensitive)
-                            : BuildComparePredicateBody("x", path, vName, CompareOpSymbol(0), isNegated: false);
+                            : BuildComparePredicateBody("x", path, vName, opSym, isNegated: isNegated);
                         subBodies.Add($"({sub})");
                     }
 
                     var joiner = rule.CombineLogicValue == 0 ? " && " : " || ";
                     var combinedBody = string.Join(joiner, subBodies);
-                    EmitAppendLambda(cb, entityFullName, $"x => {combinedBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, $"x => {combinedBody}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     cb.CloseBrace();
                     break;
                 }
@@ -314,49 +334,14 @@ partial class FilterGenerator
                     cb.AppendFormatLine("var {0} = {1};", vName, BuildScalarUnwrappedAccess(rule));
                     var opSym = CompareOpSymbol(rule.CompareOp);
                     var body = BuildComparePredicateBody("x", rule.TargetPath, vName, opSym, isNegated: rule.CompareOp == 1);
-                    EmitAppendLambda(cb, entityFullName, $"x => {body}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, $"x => {body}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     cb.CloseBrace();
                     break;
                 }
 
                 case FilterRuleKind.Range:
                 {
-                    var rVar = $"__r{idx}";
-                    if (rule.IsMemberNullableValueType)
-                    {
-                        cb.AppendFormatLine("if (this.{0} is {{ HasValue: true }} {1})", rule.MemberName, rVar);
-                    }
-                    else
-                    {
-                        cb.AppendFormatLine("if (this.{0}.HasValue)", rule.MemberName);
-                    }
-
-                    cb.OpenBrace();
-                    if (!rule.IsMemberNullableValueType)
-                    {
-                        cb.AppendFormatLine("var {0} = this.{1};", rVar, rule.MemberName);
-                    }
-
-                    var minVar = $"__min{idx}";
-                    var maxVar = $"__max{idx}";
-                    var minOp = rule.MinInclusive ? ">=" : ">";
-                    var maxOp = rule.MaxInclusive ? "<=" : "<";
-
-                    cb.AppendFormatLine("if ({0}.Min.HasValue)", rVar);
-                    cb.OpenBrace();
-                    cb.AppendFormatLine("var {0} = {1}.Min.GetValueOrDefault();", minVar, rVar);
-                    var minBody = BuildComparePredicateBody("x", rule.TargetPath, minVar, minOp, isNegated: false);
-                    EmitAppendLambda(cb, entityFullName, $"x => {minBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
-                    cb.CloseBrace();
-
-                    cb.AppendFormatLine("if ({0}.Max.HasValue)", rVar);
-                    cb.OpenBrace();
-                    cb.AppendFormatLine("var {0} = {1}.Max.GetValueOrDefault();", maxVar, rVar);
-                    var maxBody = BuildComparePredicateBody("x", rule.TargetPath, maxVar, maxOp, isNegated: false);
-                    EmitAppendLambda(cb, entityFullName, $"x => {maxBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
-                    cb.CloseBrace();
-
-                    cb.CloseBrace();
+                    EmitRangeFilterRule(cb, entityFullName, rule, idx, isQueryableMode, topCombiner, groupVars, groupLogicMap);
                     break;
                 }
 
@@ -380,7 +365,7 @@ partial class FilterGenerator
                     {
                         var opSym = CompareOpSymbol(rule.CompareOp);
                         var exactBody = BuildComparePredicateBody("x", rule.TargetPath, rawVar, opSym, isNegated: rule.CompareOp == 1);
-                        EmitAppendLambda(cb, entityFullName, $"x => {exactBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                        EmitAppendLambda(cb, entityFullName, $"x => {exactBody}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     }
                     else
                     {
@@ -399,7 +384,7 @@ partial class FilterGenerator
                             precisionEnumLiteral);
 
                         var dateBody = BuildDatePrecisionPredicateBody("x", rule.TargetPath, startVar, endVar, rule.CompareOp, isTimeOnly);
-                        EmitAppendLambda(cb, entityFullName, $"x => {dateBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                        EmitAppendLambda(cb, entityFullName, $"x => {dateBody}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     }
 
                     cb.CloseBrace();
@@ -413,7 +398,7 @@ partial class FilterGenerator
                     EmitOpenCollectionCheck(cb, rule, vColl, out var closeDepth);
                     var isNotIn = rule.Kind == FilterRuleKind.NotIn;
                     var inBody = BuildContainmentPredicateBody("x", rule.TargetPath, vColl, rule.IsCollectionElementNullableValueType, isNotIn);
-                    EmitAppendLambda(cb, entityFullName, $"x => {inBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, $"x => {inBody}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     for (var c = 0; c < closeDepth; c++)
                     {
                         cb.CloseBrace();
@@ -424,7 +409,7 @@ partial class FilterGenerator
 
                 case FilterRuleKind.Collection:
                 {
-                    EmitCollectionFilterRule(cb, entityFullName, rule, idx, isQueryableMode, groupVars, groupLogicMap);
+                    EmitCollectionFilterRule(cb, entityFullName, rule, idx, isQueryableMode, topCombiner, groupVars, groupLogicMap);
                     break;
                 }
 
@@ -449,11 +434,11 @@ partial class FilterGenerator
 
                     cb.AppendFormatLine("if ({0})", vBool);
                     cb.OpenBrace();
-                    EmitAppendLambda(cb, entityFullName, $"x => {(trueMeansNotNull ? notNullBody : isNullBody)}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, $"x => {(trueMeansNotNull ? notNullBody : isNullBody)}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     cb.CloseBrace();
                     cb.AppendLine("else");
                     cb.OpenBrace();
-                    EmitAppendLambda(cb, entityFullName, $"x => {(trueMeansNotNull ? isNullBody : notNullBody)}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    EmitAppendLambda(cb, entityFullName, $"x => {(trueMeansNotNull ? isNullBody : notNullBody)}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
                     cb.CloseBrace();
 
                     cb.CloseBrace();
@@ -487,8 +472,8 @@ partial class FilterGenerator
                         }
                     }
 
-                    var flagsBody = BuildFlagsPredicateBody("x", rule.TargetPath, maskVar, underlying, rule.FlagsModeValue == 0);
-                    EmitAppendLambda(cb, entityFullName, $"x => {flagsBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+                    var flagsBody = BuildFlagsPredicateBody("x", rule.TargetPath, maskVar, underlying, rule.FlagsModeValue);
+                    EmitAppendLambda(cb, entityFullName, $"x => {flagsBody}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
 
                     if (rule.IgnoreDefaultValue)
                     {
@@ -501,12 +486,125 @@ partial class FilterGenerator
             }
         }
 
+        private static void EmitRangeFilterRule(
+            CodeBuilder cb,
+            string entityFullName,
+            FilterRuleSpec rule,
+            int idx,
+            bool isQueryableMode,
+            string topCombiner,
+            Dictionary<string, string> groupVars,
+            Dictionary<string, int> groupLogicMap)
+        {
+            var rVar = $"__r{idx}";
+            if (rule.IsMemberNullableValueType)
+            {
+                cb.AppendFormatLine("if (this.{0} is {{ HasValue: true }} {1})", rule.MemberName, rVar);
+            }
+            else
+            {
+                cb.AppendFormatLine("if (this.{0}.HasValue)", rule.MemberName);
+            }
+
+            cb.OpenBrace();
+            if (!rule.IsMemberNullableValueType)
+            {
+                cb.AppendFormatLine("var {0} = this.{1};", rVar, rule.MemberName);
+            }
+
+            var hasDatePrecision = rule.DatePrecisionValue != 0;
+            var isTimeOnly = rule.DateKind == DateTypeKind.TimeOnly;
+            var helperMethod = isTimeOnly ? "GetTimeRange" : "GetRange";
+            var precisionEnumLiteral = $"(global::Ling.Filter.Annotations.DatePrecision){rule.DatePrecisionValue}";
+
+            string minOp;
+            string maxOp;
+            if (hasDatePrecision)
+            {
+                minOp = rule.MinInclusive ? ">=" : (isTimeOnly ? ">" : ">=");
+                maxOp = rule.MaxInclusive ? (isTimeOnly ? "<=" : "<") : "<";
+            }
+            else
+            {
+                minOp = rule.MinInclusive ? ">=" : ">";
+                maxOp = rule.MaxInclusive ? "<=" : "<";
+            }
+
+            var minVar = $"__min{idx}";
+            var maxVar = $"__max{idx}";
+
+            // Both Min and Max specified -> combine as a single AND predicate so grouping (e.g., OR group) stays atomic
+            cb.AppendFormatLine("if ({0}.Min.HasValue && {0}.Max.HasValue)", rVar);
+            cb.OpenBrace();
+            EmitRangeBoundLocal(cb, rVar, "Min", minVar, hasDatePrecision, helperMethod, precisionEnumLiteral, useEndOfBucket: !rule.MinInclusive);
+            EmitRangeBoundLocal(cb, rVar, "Max", maxVar, hasDatePrecision, helperMethod, precisionEnumLiteral, useEndOfBucket: rule.MaxInclusive);
+            var minBodyBoth = BuildComparePredicateBody("x", rule.TargetPath, minVar, minOp, isNegated: false);
+            var maxBodyBoth = BuildComparePredicateBody("x", rule.TargetPath, maxVar, maxOp, isNegated: false);
+            EmitAppendLambda(cb, entityFullName, $"x => ({minBodyBoth}) && ({maxBodyBoth})", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
+            cb.CloseBrace();
+
+            cb.AppendFormatLine("else if ({0}.Min.HasValue)", rVar);
+            cb.OpenBrace();
+            EmitRangeBoundLocal(cb, rVar, "Min", minVar, hasDatePrecision, helperMethod, precisionEnumLiteral, useEndOfBucket: !rule.MinInclusive);
+            var minBodyOnly = BuildComparePredicateBody("x", rule.TargetPath, minVar, minOp, isNegated: false);
+            EmitAppendLambda(cb, entityFullName, $"x => {minBodyOnly}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
+            cb.CloseBrace();
+
+            cb.AppendFormatLine("else if ({0}.Max.HasValue)", rVar);
+            cb.OpenBrace();
+            EmitRangeBoundLocal(cb, rVar, "Max", maxVar, hasDatePrecision, helperMethod, precisionEnumLiteral, useEndOfBucket: rule.MaxInclusive);
+            var maxBodyOnly = BuildComparePredicateBody("x", rule.TargetPath, maxVar, maxOp, isNegated: false);
+            EmitAppendLambda(cb, entityFullName, $"x => {maxBodyOnly}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
+            cb.CloseBrace();
+
+            cb.CloseBrace();
+        }
+
+        private static void EmitRangeBoundLocal(
+            CodeBuilder cb,
+            string rangeVar,
+            string boundProp,
+            string localVar,
+            bool hasDatePrecision,
+            string helperMethod,
+            string precisionEnumLiteral,
+            bool useEndOfBucket)
+        {
+            if (!hasDatePrecision)
+            {
+                cb.AppendFormatLine("var {0} = {1}.{2}.GetValueOrDefault();", localVar, rangeVar, boundProp);
+                return;
+            }
+
+            if (useEndOfBucket)
+            {
+                cb.AppendFormatLine(
+                    "var (_, {0}) = global::Ling.Filter.Expressions.DatePrecisionHelper.{1}({2}.{3}.GetValueOrDefault(), {4});",
+                    localVar,
+                    helperMethod,
+                    rangeVar,
+                    boundProp,
+                    precisionEnumLiteral);
+            }
+            else
+            {
+                cb.AppendFormatLine(
+                    "var ({0}, _) = global::Ling.Filter.Expressions.DatePrecisionHelper.{1}({2}.{3}.GetValueOrDefault(), {4});",
+                    localVar,
+                    helperMethod,
+                    rangeVar,
+                    boundProp,
+                    precisionEnumLiteral);
+            }
+        }
+
         private static void EmitCollectionFilterRule(
             CodeBuilder cb,
             string entityFullName,
             FilterRuleSpec rule,
             int idx,
             bool isQueryableMode,
+            string topCombiner,
             Dictionary<string, string> groupVars,
             Dictionary<string, int> groupLogicMap)
         {
@@ -592,7 +690,7 @@ partial class FilterGenerator
                     ? $"{NegateNavGuard("x", rule.TargetPath)} || {quantifierCall}"
                     : $"{navGuard} && {quantifierCall}";
 
-            EmitAppendLambda(cb, entityFullName, $"x => {fullLambdaBody}", isQueryableMode, rule.GroupName, groupVars, groupLogicMap);
+            EmitAppendLambda(cb, entityFullName, $"x => {fullLambdaBody}", isQueryableMode, topCombiner, rule.GroupName, groupVars, groupLogicMap);
 
             for (var c = 0; c < closeDepth; c++)
             {
@@ -634,11 +732,29 @@ partial class FilterGenerator
                 cb.AppendLine();
             }
 
-            if (target.DefaultSortPath is { } defSort)
+            if (!target.DefaultSorts.IsEmpty)
             {
-                var (_, defAccess) = BuildPathAccessAndGuard("x", defSort);
-                var orderMethod = target.DefaultSortDescending ? "OrderByDescending" : "OrderBy";
-                cb.AppendFormatLine("return global::System.Linq.Queryable.{0}(query, x => {1});", orderMethod, defAccess);
+                var firstSort = target.DefaultSorts[0];
+                var (_, firstAccess) = BuildPathAccessAndGuard("x", firstSort.TargetPath);
+                var firstOrderMethod = firstSort.Descending ? "OrderByDescending" : "OrderBy";
+
+                if (target.DefaultSorts.Length == 1)
+                {
+                    cb.AppendFormatLine("return global::System.Linq.Queryable.{0}(query, x => {1});", firstOrderMethod, firstAccess);
+                }
+                else
+                {
+                    cb.AppendFormatLine("var __ordered = global::System.Linq.Queryable.{0}(query, x => {1});", firstOrderMethod, firstAccess);
+                    for (var i = 1; i < target.DefaultSorts.Length; i++)
+                    {
+                        var nextSort = target.DefaultSorts[i];
+                        var (_, nextAccess) = BuildPathAccessAndGuard("x", nextSort.TargetPath);
+                        var thenMethod = nextSort.Descending ? "ThenByDescending" : "ThenBy";
+                        cb.AppendFormatLine("__ordered = global::System.Linq.Queryable.{0}(__ordered, x => {1});", thenMethod, nextAccess);
+                    }
+
+                    cb.AppendLine("return __ordered;");
+                }
             }
             else
             {
@@ -966,14 +1082,18 @@ partial class FilterGenerator
             PropertyPathSpec path,
             string maskVar,
             string underlyingType,
-            bool hasAllFlags)
+            int flagsMode)
         {
             var (navGuard, leaf) = BuildPathAccessAndGuard(rootParam, path);
             var leafSeg = path.Segments[^1];
             var enumExpr = leafSeg.IsNullableValueType ? $"{leaf}.Value" : leaf;
-            var bitExpr = hasAllFlags
-                ? $"((({underlyingType}){enumExpr} & {maskVar}) == {maskVar})"
-                : $"((({underlyingType}){enumExpr} & {maskVar}) != 0)";
+            var bitExpr = flagsMode switch
+            {
+                1 => $"((({underlyingType}){enumExpr} & {maskVar}) != 0)",           // HasAny
+                2 => $"(({underlyingType}){enumExpr} == {maskVar})",                // Exact
+                3 => $"((({underlyingType}){enumExpr} & {maskVar}) == 0)",          // HasNone
+                _ => $"((({underlyingType}){enumExpr} & {maskVar}) == {maskVar})",  // HasAll
+            };
 
             var core = leafSeg.IsNullableValueType ? $"{leaf}.HasValue && {bitExpr}" : bitExpr;
             return string.IsNullOrEmpty(navGuard) ? core : $"{navGuard} && {core}";

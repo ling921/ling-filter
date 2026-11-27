@@ -35,7 +35,7 @@ public static class ExpressionCombiner
     /// <param name="right">The new predicate to append, or <see langword="null"/>.</param>
     /// <returns>The combined predicate, or <see langword="null"/> if both inputs are <see langword="null"/>.</returns>
     public static Expression<Func<TEntity, bool>>? And<TEntity>(
-        Expression<Func<TEntity, bool>>? left,
+        this Expression<Func<TEntity, bool>>? left,
         Expression<Func<TEntity, bool>>? right)
     {
         if (left is null)
@@ -62,7 +62,7 @@ public static class ExpressionCombiner
     /// <param name="right">The new predicate to append, or <see langword="null"/>.</param>
     /// <returns>The combined predicate, or <see langword="null"/> if both inputs are <see langword="null"/>.</returns>
     public static Expression<Func<TEntity, bool>>? Or<TEntity>(
-        Expression<Func<TEntity, bool>>? left,
+        this Expression<Func<TEntity, bool>>? left,
         Expression<Func<TEntity, bool>>? right)
     {
         if (left is null)
@@ -89,7 +89,7 @@ public static class ExpressionCombiner
     /// <param name="logic">The boolean combination operator.</param>
     /// <returns>The combined predicate, or <see langword="null"/> if both inputs are <see langword="null"/>.</returns>
     public static Expression<Func<TEntity, bool>>? Combine<TEntity>(
-        Expression<Func<TEntity, bool>>? left,
+        this Expression<Func<TEntity, bool>>? left,
         Expression<Func<TEntity, bool>>? right,
         CombineLogic logic)
     {
@@ -103,7 +103,7 @@ public static class ExpressionCombiner
     /// <param name="predicate">The predicate expression to negate.</param>
     /// <returns>The negated predicate expression.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="predicate"/> is <see langword="null"/>.</exception>
-    public static Expression<Func<TEntity, bool>> Not<TEntity>(Expression<Func<TEntity, bool>> predicate)
+    public static Expression<Func<TEntity, bool>> Not<TEntity>(this Expression<Func<TEntity, bool>> predicate)
     {
         if (predicate is null)
         {

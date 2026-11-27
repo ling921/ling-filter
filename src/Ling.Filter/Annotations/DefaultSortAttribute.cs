@@ -1,10 +1,13 @@
 namespace Ling.Filter.Annotations;
 
 /// <summary>
-/// Configures the fallback sort field and direction used by <see cref="ISortable{TEntity}.ApplySort"/>
+/// Configures the fallback sort field(s) and direction(s) used by <see cref="ISortable{TEntity}.ApplySort"/>
 /// when <see cref="ISortable{TEntity}.SortBy"/> is <see langword="null"/>, whitespace, or does not match any allowed sort field.
+/// <para>
+/// May be applied multiple times to define secondary sort keys (<c>ThenBy</c> / <c>ThenByDescending</c>) in declaration order.
+/// </para>
 /// </summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = false, Inherited = true)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = true, Inherited = true)]
 public sealed class DefaultSortAttribute : Attribute
 {
     /// <summary>

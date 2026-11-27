@@ -32,13 +32,13 @@ public partial class OrderFilter : IFilterable<Order>, ISortable<Order>, IPagedF
 
     public OrderStatus[]? Statuses { get; set; }
 
-    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, "SkuCode", StringFilterMode.StartsWith)]
+    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, nameof(OrderItem.SkuCode), StringMode = StringFilterMode.StartsWith)]
     public string? ItemSkuPrefix { get; set; }
 
     [NullCheckFilter(nameof(Order.ShippedAt))]
     public bool? IsShipped { get; set; }
 
-    [SortField("customerName", TargetProperty = "Customer.Name")]
+    [SortField("customerName", Target = "Customer.Name")]
     public string? SortBy { get; set; }
 
     public bool SortDescending { get; set; }
@@ -70,7 +70,7 @@ Expression<Func<Order, bool>> predicate = filter.ToExpression();
 - **`[DateFilter]`**: Index-friendly (sargable) `[start, end)` range expansion for `Year`, `Month`, `Day`, `Hour`, `Minute`, and `Second`.
 - **`[MultiFieldFilter]` / `[FilterGroup]`**: Single keyword across multiple entity or navigation paths, and parenthesized `AND`/`OR` groups.
 - **`[InFilter]` / `[NotInFilter]` / `[CollectionFilter]`**: Collection containment and child navigation quantifiers (`Any`, `All`, `None`).
-- **`[NullCheckFilter]` / `[FlagsFilter]` / `[CustomFilter]`**: Nullable-boolean null checks, bitwise enum flags, and custom expression/query escape hatches.
+- **`[NullCheckFilter]` / `[FlagsFilter]` / `[CustomFilter]`**: Nullable-boolean null checks, bitwise enum flags (`HasAll`, `HasAny`, `Exact`, `HasNone`), and custom `Expression<Func<TEntity, bool>>?` escape hatches.
 - **`[SortField]` / `[DefaultSort]` / `[FilterOptions]` / `[FilterIgnore]`**: Safe dynamic sorting, type-level options, and unmapped property exclusion.
 
 ## Diagnostics

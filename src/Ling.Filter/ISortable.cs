@@ -11,14 +11,14 @@ namespace Ling.Filter;
 public interface ISortable<TEntity>
 {
     /// <summary>
-    /// Gets or sets the target sort field name or configured alias (matched case-insensitively).
+    /// Gets the target sort field name or configured alias (matched case-insensitively).
     /// </summary>
-    string? SortBy { get; set; }
+    string? SortBy { get; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether sorting should be applied in descending order.
+    /// Gets a value indicating whether sorting should be applied in descending order.
     /// </summary>
-    bool SortDescending { get; set; }
+    bool SortDescending { get; }
 
     /// <summary>
     /// Applies the requested sort specification (or configured default sort) onto the specified <paramref name="query"/>.

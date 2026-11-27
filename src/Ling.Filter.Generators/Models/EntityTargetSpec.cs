@@ -14,8 +14,8 @@ internal sealed record EntityTargetSpec(
     bool UseExplicitFilterInterface,
     bool ImplementsSortable,
     bool HasUserApplySort,
+    int DefaultLogicValue, // 0 = And, 1 = Or
     EquatableArray<FilterRuleSpec> Rules,
     EquatableArray<FilterGroupSpec> Groups,
     EquatableArray<SortFieldSpec> SortFields,
-    PropertyPathSpec? DefaultSortPath,
-    bool DefaultSortDescending);
+    EquatableArray<DefaultSortSpec> DefaultSorts);

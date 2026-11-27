@@ -68,8 +68,11 @@ partial class FilterGenerator
             var defaultStringMode = 0;         // Equals
             var defaultStringIgnorePolicy = 0; // NullOrWhiteSpace
             var trimStringsByDefault = false;
+            var caseInsensitiveStringsByDefault = false;
+            var defaultLogic = 0;              // CombineLogic.And
+            var autoMapSortableProperties = true;
             var groupConfigs = new Dictionary<string, int>(StringComparer.Ordinal);
-            AttributeData? defaultSortAttr = null;
+            var defaultSortAttrs = new List<AttributeData>();
             var classSortAttrs = new List<AttributeData>();
 
             foreach (var attr in typeSymbol.GetAttributes())
@@ -82,6 +85,9 @@ partial class FilterGenerator
                     defaultStringMode = attr.GetEnumIntValue("DefaultStringMode", 0);
                     defaultStringIgnorePolicy = attr.GetEnumIntValue("DefaultStringIgnorePolicy", 0);
                     trimStringsByDefault = attr.GetNamedValue("TrimStringsByDefault", false);
+                    caseInsensitiveStringsByDefault = attr.GetNamedValue("CaseInsensitiveStringsByDefault", false);
+                    defaultLogic = attr.GetEnumIntValue("DefaultLogic", 0);
+                    autoMapSortableProperties = attr.GetNamedValue("AutoMapSortableProperties", true);
                 }
                 else if (attrName == Constants.FilterGroupAttributeMetadataName)
                 {
@@ -93,7 +99,7 @@ partial class FilterGenerator
                 }
                 else if (attrName == Constants.DefaultSortAttributeMetadataName)
                 {
-                    defaultSortAttr = attr;
+                    defaultSortAttrs.Add(attr);
                 }
                 else if (attrName == Constants.SortFieldAttributeMetadataName)
                 {
@@ -141,6 +147,7 @@ partial class FilterGenerator
                             defaultStringMode,
                             defaultStringIgnorePolicy,
                             trimStringsByDefault,
+                            caseInsensitiveStringsByDefault,
                             localGroups);
 
                         if (rule is not null)
@@ -153,14 +160,14 @@ partial class FilterGenerator
                     {
                         if (MatchesCustomFilterEntity(method, entityType))
                         {
-                            rules.Add(CreateCustomMethodRule(method));
+                            var customRule = CreateCustomMethodRule(method, localGroups);
+                            rules.Add(customRule);
                         }
                     }
                 }
 
                 var sortFields = ImmutableArray.CreateBuilder<SortFieldSpec>();
-                PropertyPathSpec? defaultSortPath = null;
-                var defaultSortDesc = false;
+                var defaultSorts = ImmutableArray.CreateBuilder<DefaultSortSpec>();
 
                 if (implementsSort)
                 {
@@ -169,10 +176,10 @@ partial class FilterGenerator
                         entityType,
                         orderedProperties,
                         classSortAttrs,
-                        defaultSortAttr,
+                        defaultSortAttrs,
+                        autoMapSortableProperties,
                         sortFields,
-                        out defaultSortPath,
-                        out defaultSortDesc);
+                        defaultSorts);
                 }
 
                 var groupList = localGroups
@@ -188,11 +195,11 @@ partial class FilterGenerator
                     UseExplicitFilterInterface: useExplicitFilterInterface,
                     ImplementsSortable: implementsSort,
                     HasUserApplySort: hasUserApplySort,
+                    DefaultLogicValue: defaultLogic,
                     Rules: rules.ToImmutable(),
                     Groups: groupList,
                     SortFields: sortFields.ToImmutable(),
-                    DefaultSortPath: defaultSortPath,
-                    DefaultSortDescending: defaultSortDesc));
+                    DefaultSorts: defaultSorts.ToImmutable()));
             }
 
             if (targetSpecs.Count == 0)
@@ -286,8 +293,27 @@ partial class FilterGenerator
                    SymbolEqualityComparer.Default.Equals(funcType.TypeArguments[0], entityType);
         }
 
-        private static FilterRuleSpec CreateCustomMethodRule(IMethodSymbol method)
+        private static FilterRuleSpec CreateCustomMethodRule(IMethodSymbol method, Dictionary<string, int> localGroups)
         {
+            string? groupName = null;
+            foreach (var attr in method.GetAttributes())
+            {
+                if (attr.AttributeClass?.GetFullyQualifiedMetadataName() == Constants.CustomFilterAttributeMetadataName)
+                {
+                    var grp = attr.GetStringValue("Group");
+                    if (grp is not null && !string.IsNullOrWhiteSpace(grp))
+                    {
+                        groupName = grp;
+                        if (!localGroups.ContainsKey(grp))
+                        {
+                            localGroups[grp] = 1; // Default Or
+                        }
+                    }
+
+                    break;
+                }
+            }
+
             return new FilterRuleSpec(
                 Kind: FilterRuleKind.CustomMethod,
                 MemberName: method.Name,
@@ -316,7 +342,7 @@ partial class FilterGenerator
                 NullBehaviorValue: 0,
                 FlagsModeValue: 0,
                 EnumUnderlyingTypeFullName: null,
-                GroupName: null);
+                GroupName: groupName);
         }
 
         private static FilterRuleSpec? TryCreatePropertyRule(
@@ -330,6 +356,7 @@ partial class FilterGenerator
             int defaultStringMode,
             int defaultStringIgnorePolicy,
             bool trimStringsByDefault,
+            bool caseInsensitiveStringsByDefault,
             Dictionary<string, int> groupConfigs)
         {
             var attrs = prop.GetAttributes();
@@ -400,8 +427,10 @@ partial class FilterGenerator
                     collKind,
                     collElemFull,
                     isCollElemNullVal,
+                    defaultStringMode,
                     defaultStringIgnorePolicy,
                     trimStringsByDefault,
+                    caseInsensitiveStringsByDefault,
                     explicitGroup);
             }
 
@@ -503,6 +532,7 @@ partial class FilterGenerator
                     StringMode = defaultStringMode,
                     StringIgnorePolicy = defaultStringIgnorePolicy,
                     TrimString = trimStringsByDefault,
+                    CaseInsensitive = caseInsensitiveStringsByDefault,
                 };
             }
 
@@ -545,8 +575,10 @@ partial class FilterGenerator
             int collKind,
             string? collElemFull,
             bool isCollElemNullVal,
+            int defaultStringMode,
             int defaultStringIgnorePolicy,
             bool trimStringsByDefault,
+            bool caseInsensitiveStringsByDefault,
             string? groupName)
         {
             if (attrName == Constants.MultiFieldFilterAttributeMetadataName)
@@ -562,6 +594,7 @@ partial class FilterGenerator
                     isRefType,
                     defaultStringIgnorePolicy,
                     trimStringsByDefault,
+                    caseInsensitiveStringsByDefault,
                     groupName);
             }
 
@@ -581,6 +614,7 @@ partial class FilterGenerator
                     isCollElemNullVal,
                     defaultStringIgnorePolicy,
                     trimStringsByDefault,
+                    caseInsensitiveStringsByDefault,
                     groupName);
             }
 
@@ -622,10 +656,11 @@ partial class FilterGenerator
                         StringMode = attrData.GetEnumIntValue("Mode", defaultValue: 2, ctorIndex: 0),
                         StringIgnorePolicy = attrData.GetEnumIntValue("IgnorePolicy", defaultValue: defaultStringIgnorePolicy),
                         TrimString = attrData.GetNamedValue("Trim", trimStringsByDefault),
-                        CaseInsensitive = attrData.GetNamedValue("CaseInsensitive", false),
+                        CaseInsensitive = attrData.GetNamedValue("CaseInsensitive", caseInsensitiveStringsByDefault),
                     };
 
                 case Constants.RangeFilterAttributeMetadataName:
+                {
                     if (!prop.Type.TryGetValueRangeElementType(out var rangeElem) ||
                         rangeElem is null ||
                         !rangeElem.IsScalarCompatibleWith(targetLeaf) ||
@@ -634,11 +669,26 @@ partial class FilterGenerator
                         return null;
                     }
 
+                    var rangePrecision = attrData.GetEnumIntValue("Precision", defaultValue: 0);
+                    var rangeDateKind = DateTypeKind.None;
+                    if (rangePrecision != 0)
+                    {
+                        if (!rangeElem.IsDateOrTimeType(out rangeDateKind) ||
+                            !targetLeaf.IsDateOrTimeType(out var targetRangeDateKind) ||
+                            rangeDateKind != targetRangeDateKind)
+                        {
+                            return null;
+                        }
+                    }
+
                     return CreateBaseRule(FilterRuleKind.Range, prop.Name, memberFullType, rangeElem.GetFullyQualifiedName(), isNullableVal, isRefType, pathSpec, groupName) with
                     {
                         MinInclusive = attrData.GetNamedValue("MinInclusive", true),
                         MaxInclusive = attrData.GetNamedValue("MaxInclusive", true),
+                        DatePrecisionValue = rangePrecision,
+                        DateKind = rangeDateKind,
                     };
+                }
 
                 case Constants.DateFilterAttributeMetadataName:
                     if (!prop.Type.IsDateOrTimeType(out var propDateKind) ||
@@ -764,8 +814,10 @@ partial class FilterGenerator
 
                         return CreateBaseRule(FilterRuleKind.String, prop.Name, memberFullType, memberUnwrappedFullType, isNullableVal, isRefType, pathSpec, groupName) with
                         {
+                            StringMode = defaultStringMode,
                             StringIgnorePolicy = defaultStringIgnorePolicy,
                             TrimString = trimStringsByDefault,
+                            CaseInsensitive = caseInsensitiveStringsByDefault,
                         };
                     }
 
@@ -796,6 +848,7 @@ partial class FilterGenerator
             bool isRefType,
             int defaultStringIgnorePolicy,
             bool trimStringsByDefault,
+            bool caseInsensitiveStringsByDefault,
             string? groupName)
         {
             if (attrData.ConstructorArguments.Length == 0 ||
@@ -807,6 +860,7 @@ partial class FilterGenerator
             var rawValues = attrData.ConstructorArguments[0].Values;
             var paths = ImmutableArray.CreateBuilder<PropertyPathSpec>(rawValues.Length);
             var mode = attrData.GetEnumIntValue("Mode", defaultValue: 2); // Contains
+            var op = attrData.GetEnumIntValue("Operator", defaultValue: 0);
 
             foreach (var item in rawValues)
             {
@@ -828,7 +882,8 @@ partial class FilterGenerator
                         return null;
                     }
                 }
-                else if (!prop.Type.IsScalarCompatibleWith(targetType))
+                else if (!prop.Type.IsScalarCompatibleWith(targetType) ||
+                         (op is 2 or 3 or 4 or 5 && (!prop.Type.SupportsRelationalOperators() || !targetType.SupportsRelationalOperators())))
                 {
                     return null;
                 }
@@ -855,7 +910,9 @@ partial class FilterGenerator
                 StringMode = mode,
                 StringIgnorePolicy = attrData.GetEnumIntValue("IgnorePolicy", defaultValue: defaultStringIgnorePolicy),
                 TrimString = attrData.GetNamedValue("Trim", trimStringsByDefault),
-                CaseInsensitive = attrData.GetNamedValue("CaseInsensitive", false),
+                CaseInsensitive = attrData.GetNamedValue("CaseInsensitive", caseInsensitiveStringsByDefault),
+                CompareOp = op,
+                IgnoreDefaultValue = attrData.GetNamedValue("IgnoreDefaultValue", false),
                 CombineLogicValue = attrData.GetEnumIntValue("Logic", defaultValue: 1),
             };
         }
@@ -874,9 +931,10 @@ partial class FilterGenerator
             bool isCollElemNullVal,
             int defaultStringIgnorePolicy,
             bool trimStringsByDefault,
+            bool caseInsensitiveStringsByDefault,
             string? groupName)
         {
-            var navPath = attrData.GetStringValue("NavigationProperty", fallbackCtorIndex: 0);
+            attrData.GetCollectionFilterArgs(out var navPath, out var quantifier, out var elementPath);
             if (navPath is null || string.IsNullOrWhiteSpace(navPath) ||
                 !PropertyPathResolver.TryResolvePath(compilation, entityType, navPath, out var navSegments, out _))
             {
@@ -888,7 +946,6 @@ partial class FilterGenerator
                 return null;
             }
 
-            var elementPath = attrData.GetStringValue("ElementProperty", fallbackCtorIndex: 1);
             PropertyPathSpec? subPathSpec = null;
             ITypeSymbol targetScalarType;
 
@@ -944,11 +1001,11 @@ partial class FilterGenerator
                 CollectionStorageKind = collKind,
                 CollectionElementTypeFullName = collElemFull ?? targetScalarType.GetFullyQualifiedName(),
                 IsCollectionElementNullableValueType = isCollElemNullVal || isTargetScalarNullVal,
-                QuantifierValue = attrData.GetEnumIntValue("Quantifier", defaultValue: 0),
+                QuantifierValue = quantifier,
                 StringMode = attrData.GetEnumIntValue("StringMode", defaultValue: 0),
-                StringIgnorePolicy = defaultStringIgnorePolicy,
+                StringIgnorePolicy = attrData.GetEnumIntValue("IgnorePolicy", defaultValue: defaultStringIgnorePolicy),
                 TrimString = attrData.GetNamedValue("Trim", trimStringsByDefault),
-                CaseInsensitive = attrData.GetNamedValue("CaseInsensitive", false),
+                CaseInsensitive = attrData.GetNamedValue("CaseInsensitive", caseInsensitiveStringsByDefault),
                 CompareOp = op,
                 IgnoreDefaultValue = attrData.GetNamedValue("IgnoreDefaultValue", false),
             };
@@ -959,13 +1016,11 @@ partial class FilterGenerator
             ITypeSymbol entityType,
             List<IPropertySymbol> dtoProperties,
             List<AttributeData> classSortAttrs,
-            AttributeData? defaultSortAttr,
+            List<AttributeData> defaultSortAttrs,
+            bool autoMapSortableProperties,
             ImmutableArray<SortFieldSpec>.Builder sortFields,
-            out PropertyPathSpec? defaultSortPath,
-            out bool defaultSortDesc)
+            ImmutableArray<DefaultSortSpec>.Builder defaultSorts)
         {
-            defaultSortPath = null;
-            defaultSortDesc = false;
             var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // 1. Explicit class-level [SortField]
@@ -1008,36 +1063,39 @@ partial class FilterGenerator
             }
 
             // 3. Accessible scalar/comparable properties directly on entityType (and its base types)
-            for (var current = entityType as INamedTypeSymbol;
-                 current is not null && current.SpecialType == SpecialType.None;
-                 current = current.BaseType)
+            if (autoMapSortableProperties)
             {
-                foreach (var member in current.GetMembers())
+                for (var current = entityType as INamedTypeSymbol;
+                     current is not null && current.SpecialType == SpecialType.None;
+                     current = current.BaseType)
                 {
-                    if (member is IPropertySymbol { IsStatic: false, IsIndexer: false, GetMethod: not null } entityProp &&
-                        compilation.IsSymbolAccessibleWithin(entityProp, compilation.Assembly) &&
-                        IsSortablePropertyType(entityProp.Type) &&
-                        seenKeys.Add(entityProp.Name))
+                    foreach (var member in current.GetMembers())
                     {
-                        var segs = ImmutableArray.Create(new ResolvedPropertySegment(
-                            entityProp,
-                            entityProp.Name,
-                            entityProp.Type,
-                            entityProp.Type.CanBeNull()));
-                        sortFields.Add(new SortFieldSpec(entityProp.Name.ToLowerInvariant(), ToPathSpec(segs)));
+                        if (member is IPropertySymbol { IsStatic: false, IsIndexer: false, GetMethod: not null } entityProp &&
+                            compilation.IsSymbolAccessibleWithin(entityProp, compilation.Assembly) &&
+                            IsSortablePropertyType(entityProp.Type) &&
+                            seenKeys.Add(entityProp.Name))
+                        {
+                            var segs = ImmutableArray.Create(new ResolvedPropertySegment(
+                                entityProp,
+                                entityProp.Name,
+                                entityProp.Type,
+                                entityProp.Type.CanBeNull()));
+                            sortFields.Add(new SortFieldSpec(entityProp.Name.ToLowerInvariant(), ToPathSpec(segs)));
+                        }
                     }
                 }
             }
 
-            // 4. [DefaultSort]
-            if (defaultSortAttr is not null)
+            // 4. [DefaultSort] (supports multiple levels: OrderBy + ThenBy...)
+            foreach (var defaultSortAttr in defaultSortAttrs)
             {
                 var defTarget = defaultSortAttr.GetStringValue("Target", fallbackCtorIndex: 0);
-                defaultSortDesc = defaultSortAttr.GetNamedValue("Descending", defaultSortAttr.ConstructorArguments.Length > 1 && defaultSortAttr.ConstructorArguments[1].Value is true);
+                var defDesc = defaultSortAttr.GetNamedValue("Descending", defaultSortAttr.ConstructorArguments.Length > 1 && defaultSortAttr.ConstructorArguments[1].Value is true);
                 if (defTarget is not null && !string.IsNullOrWhiteSpace(defTarget) &&
                     PropertyPathResolver.TryResolvePath(compilation, entityType, defTarget, out var defSegs, out _))
                 {
-                    defaultSortPath = ToPathSpec(defSegs);
+                    defaultSorts.Add(new DefaultSortSpec(ToPathSpec(defSegs), defDesc));
                 }
             }
         }

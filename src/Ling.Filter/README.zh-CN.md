@@ -32,13 +32,13 @@ public partial class OrderFilter : IFilterable<Order>, ISortable<Order>, IPagedF
 
     public OrderStatus[]? Statuses { get; set; }
 
-    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, "SkuCode", StringFilterMode.StartsWith)]
+    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, nameof(OrderItem.SkuCode), StringMode = StringFilterMode.StartsWith)]
     public string? ItemSkuPrefix { get; set; }
 
     [NullCheckFilter(nameof(Order.ShippedAt))]
     public bool? IsShipped { get; set; }
 
-    [SortField("customerName", TargetProperty = "Customer.Name")]
+    [SortField("customerName", Target = "Customer.Name")]
     public string? SortBy { get; set; }
 
     public bool SortDescending { get; set; }
@@ -70,7 +70,7 @@ Expression<Func<Order, bool>> predicate = filter.ToExpression();
 - **`[DateFilter]`**：按 `Year`、`Month`、`Day`、`Hour`、`Minute`、`Second` 展开为索引友好的 `[start, end)` 半开区间查询。
 - **`[MultiFieldFilter]` / `[FilterGroup]`**：单关键词跨本表与导航属性多字段匹配，以及跨属性括号逻辑分组。
 - **`[InFilter]` / `[NotInFilter]` / `[CollectionFilter]`**：集合包含判断与一对多导航集合量词过滤（`Any`、`All`、`None`）。
-- **`[NullCheckFilter]` / `[FlagsFilter]` / `[CustomFilter]`**：`bool?` 空值检查、位标志枚举匹配与自定义表达式/查询逃生舱。
+- **`[NullCheckFilter]` / `[FlagsFilter]` / `[CustomFilter]`**：`bool?` 空值检查、位标志枚举匹配（`HasAll`、`HasAny`、`Exact`、`HasNone`）与自定义 `Expression<Func<TEntity, bool>>?` 逃生舱。
 - **`[SortField]` / `[DefaultSort]` / `[FilterOptions]` / `[FilterIgnore]`**：安全动态排序、类型级配置与显式忽略未映射属性。
 
 ## 编译期诊断

@@ -6,12 +6,22 @@ namespace Ling.Filter.Annotations;
 public enum FlagsMatchMode
 {
     /// <summary>
-    /// Matches when the target value contains all specified flags (<c>x.Flags.HasFlag(value)</c>).
+    /// Matches when the target value contains all specified flags (<c>(x.Flags &amp; value) == value</c>).
     /// </summary>
-    HasAllFlags = 0,
+    HasAll = 0,
 
     /// <summary>
     /// Matches when the target value shares at least one bit flag with the filter value (<c>(x.Flags &amp; value) != 0</c>).
     /// </summary>
-    HasAnyFlag = 1,
+    HasAny = 1,
+
+    /// <summary>
+    /// Matches when the target value equals the exact bitmask of the filter value (<c>x.Flags == value</c>).
+    /// </summary>
+    Exact = 2,
+
+    /// <summary>
+    /// Matches when the target value shares no bit flags with the filter value (<c>(x.Flags &amp; value) == 0</c>).
+    /// </summary>
+    HasNone = 3,
 }

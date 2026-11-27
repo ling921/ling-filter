@@ -54,11 +54,13 @@ public static class QueryableExtensions
     /// <typeparam name="TEntity">The entity type of the query.</typeparam>
     /// <param name="query">The source <see cref="IQueryable{T}"/>.</param>
     /// <param name="paged">The pagination model implementing <see cref="IPagedFilter"/>, or <see langword="null"/>.</param>
+    /// <param name="maxPageSize">Optional upper bound to clamp <see cref="IPagedFilter.PageSize"/> when positive.</param>
     /// <returns>The paginated <see cref="IQueryable{T}"/>.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="query"/> is <see langword="null"/>.</exception>
     public static IQueryable<TEntity> ApplyPaging<TEntity>(
         this IQueryable<TEntity> query,
-        IPagedFilter? paged)
+        IPagedFilter? paged,
+        int? maxPageSize = null)
     {
         if (query is null)
         {
@@ -70,8 +72,14 @@ public static class QueryableExtensions
             return query;
         }
 
+        if (maxPageSize is { } max && max > 0 && pageSize > max)
+        {
+            pageSize = max;
+        }
+
         var page = paged.Page is { } p && p > 1 ? p : 1;
-        var skip = (page - 1) * pageSize;
+        var skipLong = (long)(page - 1) * pageSize;
+        var skip = skipLong > int.MaxValue ? int.MaxValue : (int)skipLong;
         if (skip > 0)
         {
             query = query.Skip(skip);
@@ -87,11 +95,13 @@ public static class QueryableExtensions
     /// <typeparam name="TEntity">The entity type of the query.</typeparam>
     /// <param name="query">The source <see cref="IQueryable{T}"/>.</param>
     /// <param name="queryModel">The query model implementing <see cref="IFilterable{TEntity}"/>, or <see langword="null"/>.</param>
+    /// <param name="maxPageSize">Optional upper bound to clamp <see cref="IPagedFilter.PageSize"/> when pagination is applied.</param>
     /// <returns>The filtered, sorted, and paginated <see cref="IQueryable{T}"/>.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="query"/> is <see langword="null"/>.</exception>
     public static IQueryable<TEntity> ApplyQuery<TEntity>(
         this IQueryable<TEntity> query,
-        IFilterable<TEntity>? queryModel)
+        IFilterable<TEntity>? queryModel,
+        int? maxPageSize = null)
     {
         if (query is null)
         {
@@ -112,7 +122,7 @@ public static class QueryableExtensions
 
         if (queryModel is IPagedFilter paged)
         {
-            query = query.ApplyPaging(paged);
+            query = query.ApplyPaging(paged, maxPageSize);
         }
 
         return query;

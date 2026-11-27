@@ -203,7 +203,7 @@ public sealed class FilterPropertyAttributeAnalyzerTests
                 [{|#1:FlagsFilter|}]
                 public int NotAnEnum { get; set; }
 
-                [{|#2:FlagsFilter(FlagsMatchMode.HasAllFlags, "Role")|}]
+                [{|#2:FlagsFilter(FlagsMatchMode.HasAll, "Role")|}]
                 public RoleB? WrongEnum { get; set; }
 
                 [{|#3:CompareFilter(CompareOperator.GreaterThan, "ExternalId")|}]
@@ -255,5 +255,43 @@ public sealed class FilterPropertyAttributeAnalyzerTests
 
         await CSharpAnalyzerVerifier<FilterPropertyAttributeAnalyzer>
             .VerifyAnalyzerAsync(source, d0, d1, d2, d3, d4, d5Missing, d5Type);
+    }
+
+    [Fact]
+    public async Task ReportsLF0003_WhenRangeFilterDatePrecisionUsedOnNonDateValueRange_AndLF0007_ForThreeArgCollectionFilter()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using Ling.Filter;
+            using Ling.Filter.Annotations;
+
+            public class Tag { public string Code { get; set; } = ""; }
+            public class Order
+            {
+                public int Amount { get; set; }
+                public List<Tag> Tags { get; set; } = new();
+            }
+
+            public partial class OrderFilter : IFilterable<Order>
+            {
+                [{|#0:RangeFilter("Amount", Precision = DatePrecision.Day)|}]
+                public ValueRange<int>? AmountRange { get; set; }
+
+                [{|#1:CollectionFilter("Tags", CollectionQuantifier.Any, "MissingCode")|}]
+                public string? TagCode { get; set; }
+            }
+            """;
+
+        var d0 = CSharpAnalyzerVerifier<FilterPropertyAttributeAnalyzer>
+            .Diagnostic(DiagnosticDescriptors.AttributeIncompatibleWithPropertyType)
+            .WithLocation(0)
+            .WithArguments("RangeFilterAttribute", "AmountRange", "ValueRange<int>?", "DatePrecision requires 'ValueRange<T>' where T is 'DateTime', 'DateTimeOffset', 'DateOnly', or 'TimeOnly'");
+
+        var d1 = CSharpAnalyzerVerifier<FilterPropertyAttributeAnalyzer>
+            .Diagnostic(DiagnosticDescriptors.InvalidCollectionFilterTarget)
+            .WithLocation(1)
+            .WithArguments("TagCode", "element property path 'MissingCode' was not found on element type 'Tag' (missing 'MissingCode')");
+
+        await CSharpAnalyzerVerifier<FilterPropertyAttributeAnalyzer>.VerifyAnalyzerAsync(source, d0, d1);
     }
 }

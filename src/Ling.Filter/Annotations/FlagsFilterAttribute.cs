@@ -1,16 +1,17 @@
 namespace Ling.Filter.Annotations;
 
 /// <summary>
-/// Configures bitwise flag matching (<see cref="FlagsMatchMode.HasAllFlags"/> or <see cref="FlagsMatchMode.HasAnyFlag"/>)
+/// Configures bitwise flag matching (<see cref="FlagsMatchMode.HasAll"/>, <see cref="FlagsMatchMode.HasAny"/>,
+/// <see cref="FlagsMatchMode.Exact"/>, or <see cref="FlagsMatchMode.HasNone"/>)
 /// for enum properties decorated with <see cref="FlagsAttribute"/>.
 /// </summary>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 public sealed class FlagsFilterAttribute : FilterBaseAttribute
 {
     /// <summary>
-    /// Gets or sets the bitwise flag matching mode. Defaults to <see cref="FlagsMatchMode.HasAllFlags"/>.
+    /// Gets or sets the bitwise flag matching mode. Defaults to <see cref="FlagsMatchMode.HasAll"/>.
     /// </summary>
-    public FlagsMatchMode Mode { get; set; } = FlagsMatchMode.HasAllFlags;
+    public FlagsMatchMode Mode { get; set; } = FlagsMatchMode.HasAll;
 
     /// <summary>
     /// Gets or sets a value indicating whether a zero/default enum value skips predicate generation.
@@ -19,7 +20,7 @@ public sealed class FlagsFilterAttribute : FilterBaseAttribute
     public bool IgnoreZero { get; set; } = true;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FlagsFilterAttribute"/> class using <see cref="FlagsMatchMode.HasAllFlags"/>.
+    /// Initializes a new instance of the <see cref="FlagsFilterAttribute"/> class using <see cref="FlagsMatchMode.HasAll"/>.
     /// </summary>
     public FlagsFilterAttribute()
     {

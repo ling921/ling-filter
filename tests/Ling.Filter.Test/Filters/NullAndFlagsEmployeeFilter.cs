@@ -14,12 +14,18 @@ public sealed partial class NullAndFlagsEmployeeFilter : IFilterable<EmployeeEnt
     [NullCheckFilter("Department.Company")]
     public bool? HasCompany { get; set; }
 
-    [FlagsFilter(FlagsMatchMode.HasAllFlags, nameof(EmployeeEntity.Permissions))]
+    [FlagsFilter(FlagsMatchMode.HasAll, nameof(EmployeeEntity.Permissions))]
     public AccountPermissions? RequiredPermissions { get; set; }
 
-    [FlagsFilter(FlagsMatchMode.HasAnyFlag, nameof(EmployeeEntity.Permissions))]
+    [FlagsFilter(FlagsMatchMode.HasAny, nameof(EmployeeEntity.Permissions))]
     public AccountPermissions AnyPermission { get; set; }
 
-    [FlagsFilter(FlagsMatchMode.HasAllFlags, nameof(EmployeeEntity.OptionalPermissions))]
+    [FlagsFilter(FlagsMatchMode.Exact, nameof(EmployeeEntity.Permissions))]
+    public AccountPermissions? ExactPermissions { get; set; }
+
+    [FlagsFilter(FlagsMatchMode.HasNone, nameof(EmployeeEntity.Permissions))]
+    public AccountPermissions? ForbiddenPermissions { get; set; }
+
+    [FlagsFilter(FlagsMatchMode.HasAll, nameof(EmployeeEntity.OptionalPermissions))]
     public AccountPermissions? RequiredOptionalPermissions { get; set; }
 }

@@ -48,13 +48,13 @@ public partial class OrderFilter : IFilterable<Order>, ISortable<Order>, IPagedF
 
     public OrderStatus[]? Statuses { get; set; }
 
-    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, "SkuCode", StringFilterMode.StartsWith)]
+    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, nameof(OrderItem.SkuCode), StringMode = StringFilterMode.StartsWith)]
     public string? ItemSkuPrefix { get; set; }
 
     [NullCheckFilter(nameof(Order.ShippedAt))]
     public bool? IsShipped { get; set; }
 
-    [SortField("customerName", TargetProperty = "Customer.Name")]
+    [SortField("customerName", Target = "Customer.Name")]
     public string? SortBy { get; set; }
 
     public bool SortDescending { get; set; }
@@ -79,17 +79,17 @@ You can also apply filtering, sorting, or paging individually via `ApplyFilter`,
 | --- | --- |
 | `[StringFilter]` | String matching mode (`Contains`, `StartsWith`, `EndsWith`, `Equals`, etc.), trimming, case sensitivity, and ignore policy. |
 | `[CompareFilter]` | Explicit comparison operator (`Equal`, `NotEqual`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`). |
-| `[RangeFilter]` / `ValueRange<T>` | Closed or half-open interval filtering with configurable bound inclusivity. |
+| `[RangeFilter]` / `ValueRange<T>` | Closed or half-open interval filtering with configurable bound inclusivity and optional `DatePrecision`. |
 | `[DateFilter]` | Sargable `[start, end)` range expansion for `Year`, `Month`, `Day`, `Hour`, `Minute`, and `Second`. |
 | `[MultiFieldFilter]` | Matches a single keyword against multiple entity or navigation properties (`OR` / `AND`). |
 | `[FilterGroup]` | Groups multiple filter properties into a parenthesized logical sub-expression. |
 | `[InFilter]` / `[NotInFilter]` | Collection containment checks (`Contains` / `!Contains`). |
 | `[CollectionFilter]` | Navigation collection quantifiers (`Any`, `All`, `None`). |
 | `[NullCheckFilter]` | `== null` / `!= null` checks driven by a `bool?` property. |
-| `[FlagsFilter]` | Bitwise flag matching (`HasAny`, `HasAll`, `Exact`). |
-| `[CustomFilter]` | Escape hatch for custom `Expression<Func<TEntity, bool>>` or `IQueryable<TEntity>` filter methods. |
-| `[SortField]` / `[DefaultSort]` | Maps allowed sort keys to entity/navigation paths and sets default ordering. |
-| `[FilterOptions]` / `[FilterIgnore]` | Configures type-level combination logic/options or excludes unmapped DTO properties. |
+| `[FlagsFilter]` | Bitwise flag matching (`HasAll`, `HasAny`, `Exact`, `HasNone`). |
+| `[CustomFilter]` | Escape hatch for custom `Expression<Func<TEntity, bool>>?` filter methods (also supports `Group`). |
+| `[SortField]` / `[DefaultSort]` | Maps allowed sort keys to entity/navigation paths and sets single or multi-level default ordering (`OrderBy`/`ThenBy`). |
+| `[FilterOptions]` / `[FilterIgnore]` | Configures type-level combination logic, string/sort defaults, or excludes unmapped DTO properties. |
 
 ## Diagnostics
 

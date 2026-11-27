@@ -8,7 +8,7 @@ namespace Ling.Filter.Annotations;
 /// </para>
 /// </summary>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-public sealed class CollectionFilterAttribute : FilterBaseAttribute
+public sealed class CollectionFilterAttribute : Attribute
 {
     /// <summary>
     /// Gets the dot-separated path to the collection navigation property on the entity (for example, <c>"Orders"</c> or <c>"Department.Members"</c>).
@@ -34,6 +34,12 @@ public sealed class CollectionFilterAttribute : FilterBaseAttribute
     public StringFilterMode StringMode { get; set; } = StringFilterMode.Equals;
 
     /// <summary>
+    /// Gets or sets the empty/whitespace ignore policy for string inputs.
+    /// Defaults to <see cref="StringIgnorePolicy.NullOrWhiteSpace"/>.
+    /// </summary>
+    public StringIgnorePolicy IgnorePolicy { get; set; } = StringIgnorePolicy.NullOrWhiteSpace;
+
+    /// <summary>
     /// Gets or sets the relational comparison operator used when the element target is numeric, date, or comparable.
     /// Defaults to <see cref="CompareOperator.Equal"/>.
     /// </summary>
@@ -55,13 +61,17 @@ public sealed class CollectionFilterAttribute : FilterBaseAttribute
     public bool IgnoreDefaultValue { get; set; }
 
     /// <summary>
+    /// Gets or sets an optional logical group name for combining this collection predicate with other grouped properties.
+    /// </summary>
+    public string? Group { get; set; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="CollectionFilterAttribute"/> class for a primitive/scalar collection navigation property.
     /// </summary>
     /// <param name="navigationProperty">The collection navigation property path on the entity.</param>
     public CollectionFilterAttribute(string navigationProperty)
     {
         NavigationProperty = navigationProperty;
-        Target = navigationProperty;
     }
 
     /// <summary>
@@ -73,6 +83,21 @@ public sealed class CollectionFilterAttribute : FilterBaseAttribute
     {
         NavigationProperty = navigationProperty;
         ElementProperty = elementProperty;
-        Target = navigationProperty;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CollectionFilterAttribute"/> class with the specified quantifier and optional element path.
+    /// </summary>
+    /// <param name="navigationProperty">The collection navigation property path on the entity.</param>
+    /// <param name="quantifier">The collection quantifier (<see cref="CollectionQuantifier.Any"/>, <see cref="CollectionQuantifier.All"/>, or <see cref="CollectionQuantifier.None"/>).</param>
+    /// <param name="elementProperty">The optional property name or dot-separated path on each collection element.</param>
+    public CollectionFilterAttribute(
+        string navigationProperty,
+        CollectionQuantifier quantifier,
+        string? elementProperty = null)
+    {
+        NavigationProperty = navigationProperty;
+        Quantifier = quantifier;
+        ElementProperty = elementProperty;
     }
 }

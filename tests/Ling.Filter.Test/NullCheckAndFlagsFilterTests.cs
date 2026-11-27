@@ -58,5 +58,19 @@ public sealed class NullCheckAndFlagsFilterTests(SqliteTestFixture fixture) : IC
                 RequiredOptionalPermissions = AccountPermissions.Read,
             },
             1, 3);
+
+        await fixture.AssertEmployeeFilterAsync(
+            new NullAndFlagsEmployeeFilter
+            {
+                ExactPermissions = AccountPermissions.Read | AccountPermissions.Write,
+            },
+            1);
+
+        await fixture.AssertEmployeeFilterAsync(
+            new NullAndFlagsEmployeeFilter
+            {
+                ForbiddenPermissions = AccountPermissions.Write | AccountPermissions.Export,
+            },
+            3, 4);
     }
 }

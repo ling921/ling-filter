@@ -48,13 +48,13 @@ public partial class OrderFilter : IFilterable<Order>, ISortable<Order>, IPagedF
 
     public OrderStatus[]? Statuses { get; set; }
 
-    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, "SkuCode", StringFilterMode.StartsWith)]
+    [CollectionFilter(nameof(Order.Items), CollectionQuantifier.Any, nameof(OrderItem.SkuCode), StringMode = StringFilterMode.StartsWith)]
     public string? ItemSkuPrefix { get; set; }
 
     [NullCheckFilter(nameof(Order.ShippedAt))]
     public bool? IsShipped { get; set; }
 
-    [SortField("customerName", TargetProperty = "Customer.Name")]
+    [SortField("customerName", Target = "Customer.Name")]
     public string? SortBy { get; set; }
 
     public bool SortDescending { get; set; }
@@ -79,17 +79,17 @@ Expression<Func<Order, bool>> predicate = filter.ToExpression();
 | --- | --- |
 | `[StringFilter]` | 字符串匹配模式（`Contains`、`StartsWith`、`EndsWith`、`Equals` 等）、去除首尾空白、大小写敏感度与空白忽略策略。 |
 | `[CompareFilter]` | 显式比较运算符（`Equal`、`NotEqual`、`GreaterThan`、`GreaterThanOrEqual`、`LessThan`、`LessThanOrEqual`）。 |
-| `[RangeFilter]` / `ValueRange<T>` | 闭区间或半开区间筛选，支持配置上下界是否包含端点。 |
+| `[RangeFilter]` / `ValueRange<T>` | 闭区间或半开区间筛选，支持配置上下界是否包含端点与可选 `DatePrecision` 日期精度。 |
 | `[DateFilter]` | 按 `Year`、`Month`、`Day`、`Hour`、`Minute`、`Second` 展开为索引友好的 `[start, end)` 区间查询。 |
 | `[MultiFieldFilter]` | 将单个关键词同时匹配多个本表或导航属性（`OR` / `AND`）。 |
 | `[FilterGroup]` | 将多个筛选属性组合为带括号的逻辑子表达式。 |
 | `[InFilter]` / `[NotInFilter]` | 集合包含 / 排除检查（`Contains` / `!Contains`）。 |
 | `[CollectionFilter]` | 导航集合量词过滤（`Any`、`All`、`None`）。 |
 | `[NullCheckFilter]` | 由 `bool?` 属性驱动的 `== null` / `!= null` 空值检查。 |
-| `[FlagsFilter]` | 位标志枚举匹配（`HasAny`、`HasAll`、`Exact`）。 |
-| `[CustomFilter]` | 自定义 `Expression<Func<TEntity, bool>>` 或 `IQueryable<TEntity>` 筛选方法的逃生舱。 |
-| `[SortField]` / `[DefaultSort]` | 将允许的排序键映射到实体或导航属性路径，并配置默认排序。 |
-| `[FilterOptions]` / `[FilterIgnore]` | 配置类型级组合逻辑与选项，或显式忽略未映射的 DTO 属性。 |
+| `[FlagsFilter]` | 位标志枚举匹配（`HasAll`、`HasAny`、`Exact`、`HasNone`）。 |
+| `[CustomFilter]` | 自定义 `Expression<Func<TEntity, bool>>?` 筛选方法的逃生舱（支持 `Group` 分组）。 |
+| `[SortField]` / `[DefaultSort]` | 将允许的排序键映射到实体或导航属性路径，并配置单级或多级默认排序（`OrderBy`/`ThenBy`）。 |
+| `[FilterOptions]` / `[FilterIgnore]` | 配置类型级组合逻辑、字符串与排序白名单选项，或显式忽略未映射的 DTO 属性。 |
 
 ## 编译期诊断
 

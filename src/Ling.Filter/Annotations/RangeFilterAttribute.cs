@@ -19,6 +19,17 @@ public sealed class RangeFilterAttribute : FilterBaseAttribute
     public bool MaxInclusive { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the optional date/time truncation precision for date/time <see cref="ValueRange{T}"/> properties
+    /// (<see cref="DateTime"/>, <see cref="DateTimeOffset"/>, <c>DateOnly</c>, and <c>TimeOnly</c>).
+    /// <para>
+    /// For example, setting <see cref="DatePrecision.Day"/> expands <c>Min</c> to the start of the day and an inclusive <c>Max</c>
+    /// to <c>&lt; startOfNextDay</c>, naturally covering the full end calendar day while preserving index seek capability.
+    /// Defaults to <see cref="DatePrecision.Exact"/>.
+    /// </para>
+    /// </summary>
+    public DatePrecision Precision { get; set; } = DatePrecision.Exact;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="RangeFilterAttribute"/> class with closed bounds <c>[Min, Max]</c>.
     /// </summary>
     public RangeFilterAttribute()
